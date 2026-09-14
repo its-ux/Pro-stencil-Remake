@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Pro Stencils Art - AI Tattoo Stencil Generator</title>
+    <link rel="icon" href="/logo.png" />
+    <meta name="description" content="Transform any image into a perfect tattoo stencil using AI. Professional line art in seconds." />
+    <meta name="theme-color" content="#000000" />
+    
+    <!-- Open Graph / Facebook / LinkedIn / WhatsApp -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://prostencils.com/" />
+    <meta property="og:title" content="Pro Stencils Art - AI Tattoo Stencil Generator" />
+    <meta property="og:description" content="Mache aus deinen Tattoo-Ideen in Sekunden professionelle Stencils. Nutze fortschrittliche KI, um perfekte Vorlagen für tätowierer zu erstellen." />
+    <meta property="og:image" content="https://images.unsplash.com/photo-1598371839696-5c5bb00bdc28?q=80&w=1200&auto=format&fit=crop" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://prostencils.com/" />
+    <meta property="twitter:title" content="Pro Stencils Art - AI Tattoo Stencil Generator" />
+    <meta property="twitter:description" content="Mache aus deinen Tattoo-Ideen in Sekunden professionelle Stencils. Nutze fortschrittliche KI, um perfekte Vorlagen für tätowierer zu erstellen." />
+    <meta property="twitter:image" content="https://images.unsplash.com/photo-1598371839696-5c5bb00bdc28?q=80&w=1200&auto=format&fit=crop" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+      @import url('https://fonts.cdnfonts.com/css/exmouth');
+      
+      html, body {
+        overflow-x: hidden;
+        width: 100%;
+        position: relative;
+      }
+
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #121214;
+        color: #f4f4f5;
+        margin: 0;
+        padding: 0;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        overscroll-behavior-x: none;
+      }
+
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #09090b;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #27272a;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #3f3f46;
+      }
+
+      /* Fix for iOS momentum scrolling */
+      .custom-scrollbar {
+        -webkit-overflow-scrolling: touch;
+      }
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+      }
+    </style>
+    <script type="importmap">
+    {
+      "imports": {
+        "@google/genai": "https://aistudiocdn.com/@google/genai@^1.32.0",
+        "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+        "react/": "https://aistudiocdn.com/react@^19.2.1/",
+        "react": "https://aistudiocdn.com/react@^19.2.1",
+        "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0"
+      }
+    }
+    </script>
+    <script type="module" src="index.tsx"></script>
+  <link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "name": "Remix: Pro Stencils Art",
+  "description": "Transform any image into a perfect tattoo stencil using AI. Upload your photo and get a clean, high-contrast line art design ready for transfer.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

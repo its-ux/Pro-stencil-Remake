@@ -1,0 +1,140 @@
+{
+  "entities": {
+    "users": {
+      "title": "User Profile",
+      "description": "Stores user profile information and settings",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "lastLogin": { "type": "string", "format": "date-time" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "quota": { "type": "number", "description": "Max stencils total (generation limit)" },
+        "stencilCount": { "type": "number", "description": "Total stencils ever generated" }
+      },
+      "required": ["uid", "email"]
+    },
+    "stencils": {
+      "title": "Tattoo Stencil",
+      "description": "Stores generated stencils and their metadata",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner UID" },
+        "originalImage": { "type": "string", "description": "Base64 or URL of original" },
+        "stencilImage": { "type": "string", "description": "Base64 or URL of stencil" },
+        "styleName": { "type": "string" },
+        "date": { "type": "number", "description": "Timestamp" },
+        "insights": { "type": "object", "description": "AI analysis data" },
+        "dimensions": { "type": "object", "description": "Image width and height" }
+      },
+      "required": ["userId", "originalImage", "stencilImage", "styleName", "date"]
+    },
+    "siteContent": {
+      "title": "Site Content",
+      "description": "Dynamic content for the landing page",
+      "type": "object",
+      "properties": {
+        "heroTitle": { "type": "string" },
+        "heroSubtitle": { "type": "string" },
+        "infoTitle": { "type": "string" },
+        "infoDescription": { "type": "string" },
+        "styles": { "type": "array" },
+        "features": { "type": "array" },
+        "layout": { "type": "array", "description": "Ordered list of sections with visibility" },
+        "theme": { "type": "object", "description": "Theme colors and settings" }
+      }
+    },
+    "gallery": {
+      "title": "Gallery Item",
+      "description": "Publicly shared stencils in the discovery gallery",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Owner UID" },
+        "stencilImage": { "type": "string", "description": "Stencil image URL/base64" },
+        "originalImage": { "type": "string", "description": "Original image URL/base64" },
+        "styleName": { "type": "string", "description": "Name of the style applied" },
+        "createdAt": { "type": "number", "description": "Creation timestamp" },
+        "publishedAt": { "type": "number", "description": "Publishment timestamp" }
+      },
+      "required": ["uid", "stencilImage", "originalImage", "styleName", "createdAt", "publishedAt"]
+    },
+    "feedback": {
+      "title": "Feedback Submission",
+      "description": "User feedback submissions",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string", "enum": ["bug", "suggestion", "other"] },
+        "timestamp": { "type": "object", "description": "Server Timestamp" },
+        "userAgent": { "type": "string" }
+      },
+      "required": ["userId", "userEmail", "content", "type", "timestamp", "userAgent"]
+    },
+    "logs": {
+      "title": "System Log",
+      "description": "User action and system event analytics logs",
+      "type": "object",
+      "properties": {
+        "event": { "type": "string" },
+        "category": { "type": "string" },
+        "metadata": { "type": "object" },
+        "ip": { "type": "string" },
+        "userAgent": { "type": "string" },
+        "timestamp": { "type": "object", "description": "Server Timestamp" },
+        "user": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["event", "category", "metadata", "ip", "userAgent", "timestamp", "user", "userId"]
+    },
+    "messages": {
+      "title": "Support Message",
+      "description": "Direct contact messages sent from user to administration",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "userName": { "type": "string" },
+        "message": { "type": "string" },
+        "createdAt": { "type": "object", "description": "Server Timestamp" },
+        "read": { "type": "boolean" }
+      },
+      "required": ["userId", "userEmail", "message", "createdAt", "read"]
+    }
+  },
+  "firestore": {
+    "/gallery/{galleryId}": {
+      "schema": "gallery",
+      "description": "Public published gallery stencils"
+    },
+    "/users/{userId}": {
+      "schema": "users",
+      "description": "User profile document"
+    },
+    "/users/{userId}/stencils/{stencilId}": {
+      "schema": "stencils",
+      "description": "User's generated stencils"
+    },
+    "/site/content": {
+      "schema": "siteContent",
+      "description": "Global site content"
+    },
+    "/feedback/{feedbackId}": {
+      "schema": "feedback",
+      "description": "User feedback data"
+    },
+    "/logs/{logId}": {
+      "schema": "logs",
+      "description": "System trace events"
+    },
+    "/messages/{messageId}": {
+      "schema": "messages",
+      "description": "Client support inquiries"
+    }
+  }
+}

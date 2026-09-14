@@ -1,0 +1,828 @@
+
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import Header from './components/Header';
+import LandingPage from './components/LandingPage';
+import UploadCard from './components/UploadCard';
+import StyleSelector from './components/StyleSelector';
+import SettingsSelector from './components/SettingsSelector';
+import GenerateActions from './components/GenerateActions';
+import PreviewSection from './components/PreviewSection';
+import HistorySection from './components/HistorySection';
+import PrivacyPolicy from './components/PrivacyPolicy';
+import SupportCenter from './components/SupportCenter';
+import AdminPanel from './src/components/AdminPanel';
+import ProfileModal from './src/components/ProfileModal';
+import UpscalerTool from './src/components/UpscalerTool';
+import { downloadImage } from './src/lib/download';
+import { generateStencil, fileToBase64, analyzeTattooTechnique, compressImage } from './services/geminiService';
+import { AppState, StencilResult, StencilStyle, StencilHistoryItem, BackgroundMode, ArtistInsights, Language } from './types';
+import { AlertTriangle, ArrowLeft, ArrowRight, LogOut, Maximize2, Settings, ShieldAlert, PenTool } from 'lucide-react';
+import { Logo } from './components/Logo';
+import { auth, loginWithGoogle, logout, db, handleFirestoreError, OperationType, checkIfAdmin } from './src/firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, orderBy, limit, getDoc } from 'firebase/firestore';
+
+const TRANSLATIONS = {
+  en: {
+    heroTitle: "Pro Stencils Art",
+    heroSub: "Pro-grade AI conversion for elite tattoo artists. Enhanced realism & precision.",
+    uploadLabel: "Upload Your Image",
+    uploadSub: "Drag and drop your image here, or click to browse",
+    uploadBtn: "Choose File",
+    backToUpload: "Back to Upload",
+    uploadNew: "Upload New",
+    genFailed: "Generation Failed",
+    styleTitle: "Stencil Style",
+    styleSub: "Select preferred AI processing style",
+    detailLevel: "AI Detail Intensity",
+    minimal: "CLEAN",
+    balanced: "STANDARD",
+    intricate: "ELITE",
+    clean: "Clean",
+    standard: "Standard",
+    heavy: "Elite",
+    detailMinimalDesc: "Major outlines and structure only.",
+    detailBalancedDesc: "Balanced mapping of form, shadows, and reflections.",
+    detailIntricateDesc: "Maximum accuracy: every micro-texture and highlight edge traced.",
+    settingsTitle: "Stencil Settings",
+    lineColor: "Stencil Line Color",
+    background: "Background",
+    gradientColors: "Gradient Colors",
+    invertLabel: "Invert Stencil",
+    invertSub: "Switch black lines and white space",
+    createBtn: "Generate Stencil",
+    processing: "Enhancing lines via AI...",
+    reset: "Reset",
+    myStencils: "My Stencils",
+    searchPlaceholder: "Search history...",
+    exportJson: "Export JSON",
+    filterDate: "Filter by date",
+    noHistory: "No stencils found in your history.",
+    downloadBtn: "Download",
+    deleteBtn: "Delete",
+    complexity: "Project Complexity",
+    estTime: "Est. Session",
+    tonesPalette: "Tattoo Tones",
+    needles: "Recommended Needles",
+    analysisHeader: "Artist Analysis",
+    aiBadge: "AI Generated",
+    insightsDisclaimer: "AI-driven analysis based on professional realism standards.",
+    preview: "Preview",
+    compSlider: "Comparison Slider",
+    sideBySide: "Side by Side",
+    overlayView: "Overlay View",
+    download: "Download",
+    downloadPng: "Download PNG",
+    print: "Print",
+    readyTransfer: "Ready for transfer",
+    processToDownload: "Complete processing to download",
+    procreateTip: "Pro Tip: Use 'Alta Fidelidad' for realistic portraits and complex textures.",
+    mixTitle: "Ink Mix Guide",
+    mixSub: "Estimated mix ratio for these tones",
+    parts: "drops",
+    totalDrops: "Total",
+    basePigment: "Base",
+    whiteInk: "White",
+    blackInk: "Black",
+    clickToMix: "Click tone for mix guide",
+    searchHelp: "Search help",
+    searchPlaceholderHelp: "How can we help?",
+    supportTitle: "Support Center",
+    supportSub: "Optimizing your AI stencil workflow.",
+    privacy: "Privacy",
+    terms: "Terms",
+    support: "Support",
+    allRightsReserved: "All rights reserved.",
+    selectTool: "Select Your Tool",
+    selectToolSub: "Choose the AI power you need for your next masterpiece.",
+    stencilTool: "Stencil Generator",
+    stencilToolDesc: "Convert any image into a high-precision tattoo stencil.",
+    upscalerTool: "AI Upscaler",
+    upscalerToolDesc: "Enhance and sharpen blurry or low-res reference photos.",
+    openTool: "Open Tool"
+  },
+  es: {
+    heroTitle: "Pro Stencils Art",
+    heroSub: "Conversión IA de nivel profesional para artistas de élite. Realismo y precisión mejorados.",
+    uploadLabel: "Sube tu Imagen",
+    uploadSub: "Arrastra y suelta tu imagen aquí, o haz clic para buscar",
+    uploadBtn: "Elegir Archivo",
+    backToUpload: "Volver a Subir",
+    uploadNew: "Nueva Carga",
+    genFailed: "Error de Generación",
+    styleTitle: "Estilo de Stencil",
+    styleSub: "Selecciona el estilo de procesamiento IA",
+    detailLevel: "Intensidad de Detalle IA",
+    minimal: "LIMPIO",
+    balanced: "ESTÁNDAR",
+    intricate: "ÉLITE",
+    clean: "Limpio",
+    standard: "Estándar",
+    heavy: "Élite",
+    detailMinimalDesc: "Solo contornos principales y estructura.",
+    detailBalancedDesc: "Mapeo equilibrado de forma, sombras y reflejos.",
+    detailIntricateDesc: "Máxima precisión: cada micro-textura y borde de brillo trazado.",
+    settingsTitle: "Ajustes de Stencil",
+    lineColor: "Color de Línea",
+    background: "Fondo",
+    gradientColors: "Colores de Degradado",
+    invertLabel: "Invertir Stencil",
+    invertSub: "Alterna líneas negras y espacio blanco",
+    createBtn: "Generar Stencil",
+    processing: "Mejorando líneas con IA...",
+    reset: "Reiniciar",
+    myStencils: "Mis Stencils",
+    searchPlaceholder: "Buscar historial...",
+    exportJson: "Exportar JSON",
+    filterDate: "Filtrar por fecha",
+    noHistory: "No se encontraron stencils en el historial.",
+    downloadBtn: "Descargar",
+    deleteBtn: "Eliminar",
+    complexity: "Complejidad del Proyecto",
+    estTime: "Sesión Est.",
+    tonesPalette: "Tonos de Tatuaje",
+    needles: "Agujas Recomendadas",
+    analysisHeader: "Análisis del Artista",
+    aiBadge: "Generado por IA",
+    insightsDisclaimer: "Análisis impulsado por IA basado en estándares de realismo profesional.",
+    preview: "Vista Previa",
+    compSlider: "Deslizador de Comparación",
+    sideBySide: "Lado a Lado",
+    overlayView: "Vista Superpuesta",
+    download: "Descargar",
+    downloadPng: "Descargar PNG",
+    print: "Imprimir",
+    readyTransfer: "Listo para transferir",
+    processToDownload: "Completa el proceso para descargar",
+    procreateTip: "Consejo: Usa 'Alta Fidelidad' para retratos realistas y texturas complejas.",
+    mixTitle: "Guía de Mezcla",
+    mixSub: "Ratio estimado de mezcla",
+    parts: "gotas",
+    totalDrops: "Total",
+    basePigment: "Base",
+    whiteInk: "Blanco",
+    blackInk: "Negro",
+    clickToMix: "Clic para guía de mezcla",
+    searchHelp: "Buscar ayuda",
+    searchPlaceholderHelp: "¿Cómo podemos ayudarte?",
+    supportTitle: "Centro de Soporte",
+    supportSub: "Optimizando tu flujo de trabajo de stencils con IA.",
+    privacy: "Privacidad",
+    terms: "Términos",
+    support: "Soporte",
+    allRightsReserved: "Todos los derechos reservados.",
+    selectTool: "Selecciona tu Herramienta",
+    selectToolSub: "Elige el poder de la IA que necesitas para tu próxima obra maestra.",
+    stencilTool: "Generador de Stencils",
+    stencilToolDesc: "Convierte cualquier imagen en un stencil de tatuaje de alta precisión.",
+    upscalerTool: "Upscaler IA",
+    upscalerToolDesc: "Mejora y enfoca fotos de referencia borrosas o de baja resolución.",
+    openTool: "Abrir Herramienta"
+  },
+  de: {
+    heroTitle: "Pro Stencils Art",
+    heroSub: "Profi-KI-Konvertierung für Elite-Tätowierer. Verbesserter Realismus & Präzision.",
+    uploadLabel: "Bild hochladen",
+    uploadSub: "Ziehen Sie Ihr Bild hierher oder klicken Sie zum Durchsuchen",
+    uploadBtn: "Datei wählen",
+    backToUpload: "Zurück zum Upload",
+    uploadNew: "Neu hochladen",
+    genFailed: "Generierung fehlgeschlagen",
+    styleTitle: "Stencil-Stil",
+    styleSub: "Wählen Sie den bevorzugten KI-Verarbeitungsstil",
+    detailLevel: "KI-Detailintensität",
+    minimal: "SAUBER",
+    balanced: "STANDARD",
+    intricate: "ELITE",
+    clean: "Sauber",
+    standard: "Standard",
+    heavy: "Elite",
+    detailMinimalDesc: "Nur Hauptumrisse und Struktur.",
+    detailBalancedDesc: "Ausgewogene Abbildung von Form, Schatten und Reflexionen.",
+    detailIntricateDesc: "Maximale Genauigkeit: jede Mikrotextur und Glanzkante wird nachgezeichnet.",
+    settingsTitle: "Stencil-Einstellungen",
+    lineColor: "Stencil-Linienfarbe",
+    background: "Hintergrund",
+    gradientColors: "Gradientenfarben",
+    invertLabel: "Stencil invertieren",
+    invertSub: "Schwarze Linien und weißen Raum vertauschen",
+    createBtn: "Stencil generieren",
+    processing: "Linien werden per KI verbessert...",
+    reset: "Zurücksetzen",
+    myStencils: "Meine Stencils",
+    searchPlaceholder: "Verlauf durchsuchen...",
+    exportJson: "JSON exportieren",
+    filterDate: "Nach Datum filtern",
+    noHistory: "Keine Stencils in Ihrem Verlauf gefunden.",
+    downloadBtn: "Herunterladen",
+    deleteBtn: "Löschen",
+    complexity: "Projektkomplexität",
+    estTime: "Geschätzte Sitzung",
+    tonesPalette: "Tattoo-Töne",
+    needles: "Empfohlene Nadeln",
+    analysisHeader: "Künstler-Analyse",
+    aiBadge: "KI-generiert",
+    insightsDisclaimer: "KI-gestützte Analyse basierend auf professionellen Realismus-Standards.",
+    preview: "Vorschau",
+    compSlider: "Vergleichs-Slider",
+    sideBySide: "Nebeneinander",
+    overlayView: "Overlay-Ansicht",
+    download: "Download",
+    downloadPng: "PNG herunterladen",
+    print: "Drucken",
+    readyTransfer: "Bereit für den Transfer",
+    processToDownload: "Verarbeitung abschließen zum Herunterladen",
+    procreateTip: "Pro-Tipp: Verwenden Sie 'Alta Fidelidad' für realistische Porträts und komplexe Texturen.",
+    mixTitle: "Farbmisch-Leitfaden",
+    mixSub: "Geschätztes Mischverhältnis für diese Töne",
+    parts: "Tropfen",
+    totalDrops: "Gesamt",
+    basePigment: "Basis",
+    whiteInk: "Weiß",
+    blackInk: "Schwarz",
+    clickToMix: "Ton für Misch-Leitfaden anklicken",
+    searchHelp: "Hilfe suchen",
+    searchPlaceholderHelp: "Wie können wir helfen?",
+    supportTitle: "Hilfe-Center",
+    supportSub: "Optimierung Ihres KI-Stencil-Workflows.",
+    privacy: "Datenschutz",
+    terms: "AGB",
+    support: "Hilfe",
+    allRightsReserved: "Alle Rechte vorbehalten.",
+    selectTool: "Wählen Sie Ihr Werkzeug",
+    selectToolSub: "Wählen Sie die KI-Power, die Sie für Ihr nächstes Meisterwerk benötigen.",
+    stencilTool: "Stencil-Generator",
+    stencilToolDesc: "Verwandeln Sie jedes Bild in ein hochpräzises Tattoo-Stencil.",
+    upscalerTool: "KI-Upscaler",
+    upscalerToolDesc: "Verbessern und schärfen Sie unscharfe oder niedrig aufgelöste Referenzfotos.",
+    openTool: "Werkzeug öffnen"
+  }
+};
+
+const getStencilStyles = (lang: Language): StencilStyle[] => [
+  {
+    id: 'recommended',
+    name: 'High Fidelity',
+    description: lang === 'es' ? 'Trazo maestro: todo en línea fina uniforme para máximo detalle' : (lang === 'de' ? 'Meisterhafte Nachzeichnung: alles in gleichmäßigen feinen Linien für maximale Details' : 'Master trace: all uniform fine lines for maximum detail'),
+    promptModifier: `
+      CRITICAL: Act as a purely digital contour line generator. DO NOT ADD ARMS, SKIN, OR TATTOOS.
+      GOAL: Create a HIGH-DENSITY line-art map of the original image using EXCLUSIVELY UNIFORM FINE LINES.
+
+      UNIFORM FINE LINE ENFORCEMENT:
+      - ALL LINES MUST BE THE EXACT SAME THIN WEIGHT.
+      - NO variation in line thickness. NO solid black fills.
+      - The entire result must be a delicate, high-precision technical drawing.
+
+      SHADOW & EXPRESSION DEFINITION:
+      - Outline the exact boundary of every shadow area with a single fine line.
+      - Trace all texture changes and contours.
+      - Outline highlights as enclosed shapes.
+
+      TECHNICAL SPECS:
+      - Single, uniform fine line weight for everything.
+      - Maintain 1:1 spatial fidelity. Do not zoom out.
+    `
+  },
+  {
+    id: 'fine-line',
+    name: 'Micro-Line',
+    description: lang === 'es' ? 'Precisión quirúrgica para líneas finas' : (lang === 'de' ? 'Chirurgische Präzision für feine Linienarbeiten' : 'Surgical precision for fine line work'),
+    promptModifier: 'CRITICAL: Act as a digital line-art filter. DO NOT add skin or tattoos. Focus on hair-thin uniform lines, no solid shading, and high-contrast structural edges. Map all contours.'
+  },
+  {
+    id: 'bold',
+    name: 'Traditional',
+    description: lang === 'es' ? 'Bordes gruesos y definidos' : (lang === 'de' ? 'Dicke, kräftig definierte Kanten' : 'Thick, bold defined edges'),
+    promptModifier: 'CRITICAL: Act as a digital line-art filter. DO NOT add skin or tattoos. Create solid, thick outer boundary lines like a coloring book. Clear boundaries, and high-impact structural forms.'
+  }
+];
+
+const LOCAL_STORAGE_KEY = 'easy_stencil_history';
+const LANG_STORAGE_KEY = 'easy_stencil_lang';
+
+const App: React.FC = () => {
+  const [language, setLanguage] = useState<Language>(() => {
+    const saved = localStorage.getItem(LANG_STORAGE_KEY);
+    return (saved as Language) || 'es';
+  });
+  
+  const [currentView, setCurrentView] = useState<'home' | 'selection' | 'stencil' | 'upscaler' | 'privacy' | 'support'>('home');
+  const [user, setUser] = useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [userStatus, setUserStatus] = useState<'active' | 'inactive'>('active');
+  const [userQuota, setUserQuota] = useState(5);
+  const [currentQuotaUsed, setCurrentQuotaUsed] = useState(0);
+  const [customStencilStyles, setCustomStencilStyles] = useState<StencilStyle[] | null>(null);
+  
+  const t = TRANSLATIONS[language];
+  
+  useEffect(() => {
+    const fetchSiteContent = async () => {
+      try {
+        const docSnap = await getDoc(doc(db, 'site', 'content'));
+        if (docSnap.exists() && docSnap.data().stencilStyles) {
+           setCustomStencilStyles(docSnap.data().stencilStyles);
+        }
+      } catch (err) {
+        console.error("Failed to load custom styles", err);
+      }
+    };
+    fetchSiteContent();
+  }, []);
+
+  const STENCIL_STYLES = useMemo(() => {
+    const defaultStyles = getStencilStyles(language);
+    if (customStencilStyles && customStencilStyles.length > 0) {
+      return customStencilStyles.map(customStyle => {
+        const baseStyle = defaultStyles.find(s => s.id === customStyle.id);
+        if (baseStyle) {
+          return {
+            ...baseStyle,
+            promptModifier: customStyle.promptModifier || baseStyle.promptModifier
+          };
+        }
+        return customStyle;
+      });
+    }
+    return defaultStyles;
+  }, [language, customStencilStyles]);
+
+  const [appState, setAppState] = useState<AppState>(AppState.IDLE);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  
+  const [selectedStyleId, setSelectedStyleId] = useState<string>('recommended');
+  const [strength, setStrength] = useState<number>(0.95); // High density default
+  
+  const [lineColor, setLineColor] = useState<string>('#000000');
+  const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>('white');
+  const [backgroundColor, setBackgroundColor] = useState<string>('#ffffff');
+  const [invert, setInvert] = useState<boolean>(false);
+  const [gradientColors, setGradientColors] = useState<[string, string]>(['#4f46e5', '#ec4899']); 
+
+  const [result, setResult] = useState<StencilResult | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [history, setHistory] = useState<StencilHistoryItem[]>([]);
+
+  const styleSelectorRef = useRef<HTMLDivElement>(null);
+  const previewSectionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    localStorage.setItem(LANG_STORAGE_KEY, language);
+  }, [language]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        const adminStatus = await checkIfAdmin(currentUser.uid);
+        setIsAdmin(adminStatus);
+        
+        if (currentView === 'home') {
+          setCurrentView('selection');
+        }
+        
+        // Fetch user status and quota
+        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          setUserStatus(data.status || 'active');
+          setUserQuota(data.quota || 5);
+        }
+      } else {
+        setIsAdmin(false);
+      }
+      setIsAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setHistory([]);
+      setCurrentQuotaUsed(0);
+      return;
+    }
+
+    const stencilsRef = collection(db, 'users', user.uid, 'stencils');
+    const q = query(stencilsRef, orderBy('date', 'desc'));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setCurrentQuotaUsed(snapshot.size);
+      const items = snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id
+      })) as StencilHistoryItem[];
+      setHistory(items);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/stencils`);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const saveToHistory = async (newItem: StencilHistoryItem) => {
+    if (!user) return;
+    try {
+      // Compress images to stay under 1MB Firestore limit
+      const [compressedOriginal, compressedStencil] = await Promise.all([
+        compressImage(newItem.originalImage, 800, 0.5),
+        compressImage(newItem.stencilImage, 1024, 0.6)
+      ]);
+
+      const stencilRef = doc(collection(db, 'users', user.uid, 'stencils'), newItem.id);
+      await setDoc(stencilRef, {
+        userId: user.uid,
+        originalImage: compressedOriginal,
+        stencilImage: compressedStencil,
+        styleName: newItem.styleName,
+        date: newItem.date,
+        insights: newItem.insights || null,
+        dimensions: newItem.dimensions || null
+      });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.WRITE, `users/${user.uid}/stencils/${newItem.id}`);
+    }
+  };
+
+  const deleteHistoryItem = async (id: string) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, 'users', user.uid, 'stencils', id));
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, `users/${user.uid}/stencils/${id}`);
+    }
+  };
+
+  const handleFileSelect = async (file: File) => {
+    try {
+      const base64 = await fileToBase64(file);
+      setPreviewUrl(base64);
+      setSelectedFile(file);
+      setAppState(AppState.CONFIGURING);
+      setErrorMsg(null);
+      setTimeout(() => styleSelectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
+    } catch (e) {
+      setErrorMsg("Failed to read file.");
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (!selectedFile) return;
+    if (currentQuotaUsed >= userQuota) {
+      alert(`Quota reached! You have used ${currentQuotaUsed}/${userQuota} stencils. Contact admin to increase quota.`);
+      return;
+    }
+    
+    setAppState(AppState.PROCESSING);
+    setErrorMsg(null);
+    
+    setTimeout(() => {
+      previewSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+
+    try {
+      const style = STENCIL_STYLES.find(s => s.id === selectedStyleId) || STENCIL_STYLES[0];
+      
+      const [stencilData, techniqueAnalysis] = await Promise.all([
+        generateStencil(selectedFile, style, strength, { backgroundMode, backgroundColor, lineColor, invert, gradientColors }),
+        analyzeTattooTechnique(selectedFile, language)
+      ]);
+
+      const newResult: StencilResult = { 
+        originalImage: previewUrl || '', 
+        stencilImage: stencilData.stencilImage, 
+        insights: techniqueAnalysis,
+        dimensions: stencilData.dimensions
+      };
+      
+      setResult(newResult);
+      setAppState(AppState.SUCCESS);
+      saveToHistory({ ...newResult, id: crypto.randomUUID(), date: Date.now(), styleName: style.name });
+    } catch (err: any) {
+      setAppState(AppState.ERROR);
+      setErrorMsg(err instanceof Error ? err.message : "AI processing failed.");
+    }
+  };
+
+  const toggleLanguage = () => setLanguage(l => {
+    if (l === 'en') return 'es';
+    if (l === 'es') return 'de';
+    return 'en';
+  });
+  const resetApp = () => {
+    setAppState(AppState.IDLE);
+    setResult(null);
+    setErrorMsg(null);
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    setCurrentView('home');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDownload = () => {
+    if (result) {
+      downloadImage(result.stencilImage, `easy-stencil-ai-${Date.now()}.png`);
+    }
+  };
+
+  const currentStyleName = STENCIL_STYLES.find(s => s.id === selectedStyleId)?.name || 'Unknown';
+  const isConfiguringOrSuccess = appState === AppState.CONFIGURING || appState === AppState.PROCESSING || appState === AppState.SUCCESS || appState === AppState.ERROR;
+
+  const handleLogin = async () => {
+    if (isLoggingIn) return;
+    setIsLoggingIn(true);
+    try {
+      await loginWithGoogle();
+    } catch (error: any) {
+      const ignoredErrors = ['auth/cancelled-popup-request', 'auth/popup-closed-by-user'];
+      if (!ignoredErrors.includes(error.code)) {
+        console.error("Login failed", error);
+      }
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      resetApp();
+    } catch (error) {
+      console.error("Logout failed", error);
+    }
+  };
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (user && userStatus === 'inactive') {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 text-center space-y-6">
+        <ShieldAlert className="w-20 h-20 text-red-500 animate-pulse" />
+        <h1 className="text-3xl font-bold">Account Deactivated</h1>
+        <p className="text-zinc-400 max-w-md">Your account has been deactivated by an administrator. Please contact support if you believe this is an error.</p>
+        <button onClick={handleLogout} className="px-8 py-3 bg-white/10 hover:bg-white/20 rounded-full font-bold transition-all">
+          Logout
+        </button>
+      </div>
+    );
+  }
+
+  if (showAdminPanel && isAdmin) {
+    return <AdminPanel onClose={() => setShowAdminPanel(false)} />;
+  }
+
+  if (!user && currentView === 'home') {
+    return <LandingPage onLogin={handleLogin} isAdmin={isAdmin} onOpenAdmin={() => setShowAdminPanel(true)} isLoggingIn={isLoggingIn} />;
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col text-zinc-50 selection:bg-orange-500/30 relative">
+      {/* Background Image with Overlay */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <img 
+          src="https://images.unsplash.com/photo-1479767574301-a01c78234a0c?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0" 
+          alt="Tattoo Background" 
+          className="w-full h-full object-cover opacity-90 grayscale contrast-125"
+          referrerPolicy="no-referrer"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-black/70" />
+        <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] bg-orange-600/20 rounded-full blur-[120px]" />
+        <div className="absolute top-[40%] -right-[10%] w-[40%] h-[60%] bg-orange-900/10 rounded-full blur-[120px]" />
+      </div>
+
+      <Header 
+        language={language} 
+        onLanguageToggle={toggleLanguage} 
+        onLogout={handleLogout} 
+        isAdmin={isAdmin} 
+        onOpenAdmin={() => setShowAdminPanel(true)} 
+        onOpenProfile={() => setShowProfile(true)}
+        userPhoto={user?.photoURL}
+        onLogoClick={() => setCurrentView('selection')}
+      />
+      
+      {user && (
+        <ProfileModal 
+          isOpen={showProfile}
+          onClose={() => setShowProfile(false)}
+          userData={{
+            displayName: user.displayName,
+            email: user.email,
+            photoURL: user.photoURL,
+            role: isAdmin ? 'Admin' : 'Artist',
+            quota: userQuota,
+            used: currentQuotaUsed
+          }}
+          lastStencils={history.slice(0, 3)}
+          onDeleteStencil={deleteHistoryItem}
+        />
+      )}
+      <main className="flex-grow flex flex-col items-center justify-start relative z-10">
+        
+        <div className="w-full relative z-10 flex flex-col items-center px-4 md:px-8">
+          {currentView === 'privacy' && (
+            <PrivacyPolicy onBack={() => { setCurrentView('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
+          )}
+          {currentView === 'support' && (
+            <SupportCenter onBack={() => { setCurrentView('selection'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} language={language} translations={t} />
+          )}
+          {currentView === 'selection' && (
+            <div className="w-full max-w-6xl mx-auto px-4 py-12 md:py-20 animate-in fade-in slide-in-from-bottom-8 duration-700">
+              <div className="text-center space-y-4 mb-16">
+                <h2 className="text-4xl md:text-6xl font-bold text-[#ff7106]">
+                  {t.selectTool}
+                </h2>
+                <p className="text-[#eeeeff] text-lg md:text-xl max-w-2xl mx-auto">
+                  {t.selectToolSub}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Stencil Tool Card */}
+                <button 
+                  onClick={() => setCurrentView('stencil')}
+                  className="group relative bg-zinc-900/40 backdrop-blur-xl border border-white/5 rounded-[2.5rem] p-8 text-left transition-all hover:bg-zinc-900/60 hover:border-orange-500/30 hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-[2.5rem]" />
+                  <div className="relative z-10 space-y-6">
+                    <div className="w-16 h-16 bg-orange-600/20 rounded-2xl flex items-center justify-center">
+                      <PenTool className="w-10 h-10 text-orange-500" />
+                    </div>
+                    <div>
+                      <h3 className="text-3xl font-bold text-white mb-2">{t.stencilTool}</h3>
+                      <p className="text-zinc-400 leading-relaxed">
+                        {t.stencilToolDesc}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 text-orange-500 font-bold uppercase tracking-widest text-sm">
+                      {t.openTool}
+                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    </div>
+                  </div>
+                </button>
+
+                {/* Upscaler Tool Card */}
+                <button 
+                  onClick={() => setCurrentView('upscaler')}
+                  className="group relative bg-zinc-900/40 backdrop-blur-xl border border-white/5 rounded-[2.5rem] p-8 text-left transition-all hover:bg-zinc-900/60 hover:border-orange-500/30 hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-[2.5rem]" />
+                  <div className="relative z-10 space-y-6">
+                    <div className="w-16 h-16 bg-orange-600/20 rounded-2xl flex items-center justify-center">
+                      <Maximize2 className="w-10 h-10 text-orange-500" />
+                    </div>
+                    <div>
+                      <h3 className="text-3xl font-bold text-white mb-2">{t.upscalerTool}</h3>
+                      <p className="text-zinc-400 leading-relaxed">
+                        {t.upscalerToolDesc}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 text-orange-500 font-bold uppercase tracking-widest text-sm">
+                      {t.openTool}
+                      <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
+          {currentView === 'stencil' && (
+            <div className="w-full max-w-[1800px] mx-auto px-4 py-8 space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex items-center justify-between mb-4">
+                <button 
+                  onClick={() => setCurrentView('selection')}
+                  className="flex items-center gap-2 text-zinc-500 hover:text-white transition-colors text-sm font-medium"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  {t.backToUpload}
+                </button>
+              </div>
+              <div className="space-y-8">
+                {appState === AppState.IDLE && (
+                  <div className="flex flex-col items-center gap-8 animate-in fade-in zoom-in-95 duration-500 w-full mb-12">
+                     <div className="text-center space-y-2 mb-4 mt-8">
+                        <h2 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-white to-orange-200">
+                          {t.heroTitle}
+                        </h2>
+                        <p className="text-zinc-400 text-lg">{t.heroSub}</p>
+                     </div>
+                    <UploadCard onFileSelect={handleFileSelect} translations={t} />
+                  </div>
+                )}
+                {isConfiguringOrSuccess && previewUrl && (
+                  <div className="w-full flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-8 duration-500 mb-12">
+                      <div className="flex justify-start mb-4">
+                         <button onClick={resetApp} className="text-zinc-500 hover:text-white text-sm flex items-center gap-1 transition-colors">
+                            <ArrowLeft className="w-4 h-4" /> {t.uploadNew}
+                         </button>
+                      </div>
+                      {appState === AppState.ERROR && (
+                         <div className="bg-red-900/20 border border-red-900/50 p-4 rounded-xl mb-6 flex items-start gap-3 text-red-200 animate-in fade-in slide-in-from-top-2">
+                             <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+                             <div>
+                                <p className="font-semibold">{t.genFailed}</p>
+                                <p className="text-sm opacity-80">{errorMsg}</p>
+                             </div>
+                         </div>
+                      )}
+                      
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                        <div className="space-y-6">
+                          <div ref={styleSelectorRef}>
+                             <StyleSelector 
+                                 styles={STENCIL_STYLES}
+                                 selectedStyleId={selectedStyleId}
+                                 onSelectStyle={setSelectedStyleId}
+                                 strength={strength}
+                                 onStrengthChange={setStrength}
+                                 disabled={appState === AppState.PROCESSING}
+                                 translations={t}
+                                 language={language}
+                             />
+                          </div>
+                          <SettingsSelector 
+                             lineColor={lineColor}
+                             onLineColorChange={setLineColor}
+                             backgroundMode={backgroundMode}
+                             onBackgroundModeChange={setBackgroundMode}
+                             backgroundColor={backgroundColor}
+                             onBackgroundColorChange={setBackgroundColor}
+                             invert={invert}
+                             onInvertChange={setInvert}
+                             gradientColors={gradientColors}
+                             onGradientColorsChange={setGradientColors}
+                             disabled={appState === AppState.PROCESSING}
+                             translations={t}
+                          />
+                          <GenerateActions onGenerate={handleGenerate} onReset={resetApp} isProcessing={appState === AppState.PROCESSING} translations={t} />
+                        </div>
+                        
+                        <div className="flex flex-col gap-4" ref={previewSectionRef}>
+                           <div className="sticky top-24">
+                              <PreviewSection 
+                                 originalImage={previewUrl}
+                                 stencilImage={result?.stencilImage || null}
+                                 isProcessing={appState === AppState.PROCESSING}
+                                 translations={t}
+                                 onDownload={handleDownload}
+                                 artistInsights={result?.insights}
+                              />
+                           </div>
+                        </div>
+                      </div>
+                  </div>
+                )}
+              </div>
+              {history.length > 0 && <HistorySection history={history} onDelete={deleteHistoryItem} translations={t} />}
+            </div>
+          )}
+          {currentView === 'upscaler' && (
+            <div className="w-full max-w-6xl mx-auto px-4 py-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="flex items-center justify-between mb-4">
+                <button 
+                  onClick={() => setCurrentView('selection')}
+                  className="flex items-center gap-2 text-zinc-500 hover:text-white transition-colors text-sm font-medium"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  {t.backToUpload}
+                </button>
+              </div>
+              <div className="bg-zinc-900/30 border border-white/5 rounded-[2.5rem] p-1 overflow-hidden">
+                <UpscalerTool hideHeader />
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
+      <footer className="w-full py-8 px-8 flex items-center justify-between text-zinc-600 text-sm relative z-10 border-t border-zinc-900 bg-zinc-950">
+        <div className="flex items-center gap-4">
+          <div className="w-[60px] h-[60px] rounded-lg shadow-md flex items-center justify-center overflow-hidden border border-zinc-800">
+            <Logo className="w-full h-full" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-white font-bold text-lg tracking-tight leading-none">Pro Stencils Art</span>
+          </div>
+        </div>
+        <p className="text-zinc-600 text-sm">© 2025 Pro Stencils Art. {t.allRightsReserved}</p>
+        <div className="flex gap-6 font-medium">
+          <button onClick={() => { setCurrentView('privacy'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-zinc-400 transition-colors">{t.privacy}</button>
+          <a href="#" className="hover:text-zinc-400 transition-colors">{t.terms}</a>
+          <button onClick={() => { setCurrentView('support'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-zinc-400 transition-colors">{t.support}</button>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+export default App;
